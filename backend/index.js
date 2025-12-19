@@ -22,14 +22,13 @@ dotenv.config();
 //Initialize App
 const app = express();
 
-// Rate limiter Function
+// Rate limiter Function (Relaxed for development)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes).
-  standardHeaders: "draft-8", // draft-6: `RateLimit-*` headers; draft-7 & draft-8: combined `RateLimit` header
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers.
-  ipv6Subnet: 56, // Set to 60 or 64 to be less aggressive, or 52 or 48 to be more aggressive
-  // store: ... , // Redis, Memcached, etc. See below.
+  limit: 1000, // Increased limit for development (100 requests per 15min was triggering easily during dev)
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  // Note: In production, reduce this to 100-200 and consider applying only to sensitive routes
 });
 
 //Middleware

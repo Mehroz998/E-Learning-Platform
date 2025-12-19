@@ -172,19 +172,24 @@ export const submitAssignment = async (req, res, next) => {
 
 export const gradeSubmission = async (req, res, next) => {
   try {
-    const { id } = req.params; // submission id (Note: endpoint path uses submission id, not assignment id)
+    const { id } = req.params; // submission id
     const { grade, feedback } = req.body;
     const grader_id = req.user.id;
 
-    // Verify grader is instructor of course
+    // Verify grader is instructor of course and get additional data
     const authCheck = await pool.query(
       `
-            SELECT asub.id 
+            SELECT asub.id, asub.student_id, a.lesson_id,
+                   e.id as enrollment_id,
+                   (SELECT COUNT(*) FROM lessons l2 
+                    JOIN sections s2 ON l2.section_id = s2.id 
+                    WHERE s2.course_id = c.id) as total_lessons
             FROM assignment_submissions asub
             JOIN assignments a ON asub.assignment_id = a.id
             JOIN lessons l ON a.lesson_id = l.id
             JOIN sections s ON l.section_id = s.id
             JOIN courses c ON s.course_id = c.id
+            JOIN enrollments e ON c.id = e.course_id AND e.student_id = asub.student_id
             WHERE asub.id = $1 AND (c.instructor_id = $2 OR $3 = 'admin')
         `,
       [id, grader_id, req.user.role]
@@ -193,6 +198,8 @@ export const gradeSubmission = async (req, res, next) => {
     if (authCheck.rows.length === 0)
       return next(new AppError("Submission not found or unauthorized", 403));
 
+    const { lesson_id, enrollment_id, total_lessons } = authCheck.rows[0];
+
     const query = `
             UPDATE assignment_submissions
             SET grade = $1, feedback = $2, graded_by = $3, graded_at = NOW()
@@ -200,6 +207,34 @@ export const gradeSubmission = async (req, res, next) => {
             RETURNING *
         `;
     const result = await pool.query(query, [grade, feedback, grader_id, id]);
+
+    // Mark lesson as complete after grading
+    await pool.query(
+      `
+            INSERT INTO lesson_progress (enrollment_id, lesson_id, completed, completed_at)
+            VALUES ($1, $2, true, NOW())
+            ON CONFLICT (enrollment_id, lesson_id) DO UPDATE 
+            SET completed = true, completed_at = NOW()
+        `,
+      [enrollment_id, lesson_id]
+    );
+
+    // Update enrollment progress
+    const countCompleted = await pool.query(
+      "SELECT COUNT(*) FROM lesson_progress WHERE enrollment_id = $1 AND completed = true",
+      [enrollment_id]
+    );
+    const completedCount = parseInt(countCompleted.rows[0].count);
+    const progressPercent =
+      total_lessons > 0
+        ? Math.round((completedCount / total_lessons) * 100)
+        : 0;
+
+    const completed_at = progressPercent === 100 ? new Date() : null;
+    await pool.query(
+      "UPDATE enrollments SET progress = $1, completed_at = $2 WHERE id = $3",
+      [progressPercent, completed_at, enrollment_id]
+    );
 
     res
       .status(200)

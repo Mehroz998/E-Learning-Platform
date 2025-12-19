@@ -188,8 +188,10 @@ const CoursePlayer = () => {
       );
 
       setSubmissionResult(response.data);
-      toast.success("Assignment submitted successfully!");
-      markComplete();
+      toast.success(
+        "Assignment submitted successfully! Wait for instructor grading."
+      );
+      // NOTE: Do NOT mark complete here - assignments are only marked complete after instructor grading
     } catch (error) {
       toast.error("Failed to submit assignment");
     } finally {
@@ -270,12 +272,14 @@ const CoursePlayer = () => {
             {/* Player/Content View (Top Part) */}
             {currentLesson.content_type === "video" &&
             currentLesson.video_url ? (
-              <div className="bg-black flex items-center justify-center relative shadow-2xl z-20 aspect-video w-full">
-                <iframe
-                  src={getEmbedUrl(currentLesson.video_url)}
-                  className="w-full h-full"
-                  allowFullScreen
-                />
+              <div className="w-full bg-black flex items-center justify-center relative shadow-2xl z-20">
+                <div className="w-full max-w-4xl aspect-video">
+                  <iframe
+                    src={getEmbedUrl(currentLesson.video_url)}
+                    className="w-full h-full"
+                    allowFullScreen
+                  />
+                </div>
               </div>
             ) : currentLesson.content_type === "quiz" && quizData ? (
               <div className="w-full bg-gray-50 flex flex-col h-[calc(100vh-140px)] overflow-hidden">
