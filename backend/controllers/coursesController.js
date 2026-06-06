@@ -18,10 +18,15 @@ export const createCourse = async (req, res, next) => {
     const instructor_id = req.user.id;
 
     if (req.file) {
-      thumbnail = await uploadThumbnail(req.file.path);
+      thumbnail = await uploadThumbnail(req.file.buffer);
     } else if (thumbnail && !thumbnail.includes("cloudinary.com")) {
       try {
-        thumbnail = await uploadThumbnail(thumbnail);
+        // thumbnail = await uploadThumbnail(thumbnail);
+        const response = await fetch(thumbnail);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        thumbnail = await uploadThumbnail(buffer);
+
       } catch (error) {
         throw new AppError("Failed to upload thumbnail from URL", 400);
       }
@@ -244,10 +249,14 @@ export const updateCourse = async (req, res, next) => {
     let thumbnail = req.body.thumbnail;
 
     if (req.file) {
-      thumbnail = await uploadThumbnail(req.file.path);
+      thumbnail = await uploadThumbnail(req.file.buffer);
     } else if (thumbnail && !thumbnail.includes("cloudinary.com")) {
       try {
-        thumbnail = await uploadThumbnail(thumbnail);
+        // thumbnail = await uploadThumbnail(thumbnail);
+        const response = await fetch(thumbnail);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        thumbnail = await uploadThumbnail(buffer);
       } catch (error) {
         throw new AppError("Failed to upload thumbnail from URL", 400);
       }

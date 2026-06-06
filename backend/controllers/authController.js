@@ -21,7 +21,7 @@ export const register = async (req, res, next) => {
 
     let avatar = req.body.avatar;
     if (req.file) {
-      avatar = await uploadProfile(req.file.path);
+      avatar = await uploadProfile(req.file.buffer);
     }
 
     // Check user enter all the fields
