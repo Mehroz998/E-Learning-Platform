@@ -1,0 +1,314 @@
+PROJECT 2: E-Learning Platform ⭐⭐⭐
+
+Project Description
+Build a comprehensive online learning platform where instructors can create courses and students can enroll, watch videos, complete assignments, and track progress.
+Core Features Required
+
+
+1. User Management
+.Registration with role selection (Student, Instructor, Admin)
+.Profile management with bio and avatar
+.Instructor verification system
+.Student dashboard
+.Instructor dashboard
+
+2. Course Management
+.Create, edit, delete courses (Instructor only)
+.Course details: title, description, category, price, thumbnail
+.Course status: draft, published, archived
+.Course enrollment
+.Course ratings and reviews
+
+3. Curriculum & Content
+.Sections and lessons hierarchy
+.Video lessons (YouTube/Vimeo embed or upload)
+.Text content (rich text editor)
+.Downloadable resources (PDFs, files)
+.Quizzes with multiple choice questions
+.Assignments submission
+
+4. Progress Tracking
+.Mark lessons as complete
+.Track course completion percentage
+.Quiz scores and history
+.Assignment submissions and grading
+.Certificates on course completion
+
+5. Search & Discovery
+.Search courses by title/description
+.Filter by category, price, rating
+.Sort by popularity, rating, newest
+.Featured courses
+.Recommended courses
+
+6. Reviews & Ratings
+.Rate courses (1-5 stars)
+.Write reviews
+.Helpful/not helpful voting
+.Instructor responses to reviews
+
+Database Schema
+
+-- Users
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'student' CHECK (role IN ('student', 'instructor', 'admin')),
+    avatar VARCHAR(255),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Categories
+CREATE TABLE categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    icon VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Courses
+CREATE TABLE courses (
+    id SERIAL PRIMARY KEY,
+    instructor_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT,
+    category_id INTEGER REFERENCES categories(id),
+    level VARCHAR(20) CHECK (level IN ('beginner', 'intermediate', 'advanced')),
+    price DECIMAL(10,2) DEFAULT 0,
+    thumbnail VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+    total_duration INTEGER, -- in minutes
+    total_lessons INTEGER DEFAULT 0,
+    total_enrollments INTEGER DEFAULT 0,
+    average_rating DECIMAL(3,2) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Sections
+CREATE TABLE sections (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    order_index INTEGER NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lessons
+CREATE TABLE lessons (
+    id SERIAL PRIMARY KEY,
+    section_id INTEGER REFERENCES sections(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    content_type VARCHAR(20) CHECK (content_type IN ('video', 'text', 'quiz', 'assignment')),
+    video_url VARCHAR(500),
+    text_content TEXT,
+    duration INTEGER, -- in minutes
+    order_index INTEGER NOT NULL,
+    is_preview BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Enrollments
+CREATE TABLE enrollments (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+    enrolled_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    progress INTEGER DEFAULT 0, -- percentage
+    completed_at TIMESTAMPTZ,
+    certificate_url VARCHAR(255),
+    UNIQUE(student_id, course_id)
+);
+
+-- Lesson Progress
+CREATE TABLE lesson_progress (
+    id SERIAL PRIMARY KEY,
+    enrollment_id INTEGER REFERENCES enrollments(id) ON DELETE CASCADE,
+    lesson_id INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
+    completed BOOLEAN DEFAULT false,
+    completed_at TIMESTAMPTZ,
+    UNIQUE(enrollment_id, lesson_id)
+);
+
+-- Quizzes
+CREATE TABLE quizzes (
+    id SERIAL PRIMARY KEY,
+    lesson_id INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    passing_score INTEGER DEFAULT 70,
+    time_limit INTEGER, -- in minutes
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Quiz Questions
+CREATE TABLE quiz_questions (
+    id SERIAL PRIMARY KEY,
+    quiz_id INTEGER REFERENCES quizzes(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    option_a TEXT NOT NULL,
+    option_b TEXT NOT NULL,
+    option_c TEXT NOT NULL,
+    option_d TEXT NOT NULL,
+    correct_answer CHAR(1) CHECK (correct_answer IN ('A', 'B', 'C', 'D')),
+    points INTEGER DEFAULT 1,
+    order_index INTEGER
+);
+
+-- Quiz Attempts
+CREATE TABLE quiz_attempts (
+    id SERIAL PRIMARY KEY,
+    enrollment_id INTEGER REFERENCES enrollments(id) ON DELETE CASCADE,
+    quiz_id INTEGER REFERENCES quizzes(id) ON DELETE CASCADE,
+    score INTEGER,
+    total_points INTEGER,
+    percentage DECIMAL(5,2),
+    passed BOOLEAN,
+    started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMPTZ
+);
+
+-- Assignments
+CREATE TABLE assignments (
+    id SERIAL PRIMARY KEY,
+    lesson_id INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    due_date TIMESTAMPTZ,
+    max_score INTEGER DEFAULT 100,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Assignment Submissions
+CREATE TABLE assignment_submissions (
+    id SERIAL PRIMARY KEY,
+    assignment_id INTEGER REFERENCES assignments(id) ON DELETE CASCADE,
+    student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT,
+    file_url VARCHAR(255),
+    submitted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    grade INTEGER,
+    feedback TEXT,
+    graded_by INTEGER REFERENCES users(id),
+    graded_at TIMESTAMPTZ,
+    UNIQUE(assignment_id, student_id)
+);
+
+-- Reviews
+CREATE TABLE reviews (
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+    student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    review TEXT,
+    helpful_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(course_id, student_id)
+);
+
+-- Resources (downloadable files)
+CREATE TABLE resources (
+    id SERIAL PRIMARY KEY,
+    lesson_id INTEGER REFERENCES lessons(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    file_url VARCHAR(500) NOT NULL,
+    file_size INTEGER,
+    file_type VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+API Endpoints Required
+// Courses
+GET    /api/courses                // Browse courses with filters
+GET    /api/courses/:id            // Course details
+POST   /api/courses                // Create (Instructor only)
+PUT    /api/courses/:id            // Update (Instructor only)
+DELETE /api/courses/:id            // Delete (Instructor only)
+POST   /api/courses/:id/enroll     // Enroll in course
+GET    /api/courses/:id/curriculum // Course structure
+GET    /api/courses/my-courses     // Student's enrolled courses
+GET    /api/courses/my-teaching    // Instructor's courses
+
+// Sections
+POST   /api/courses/:id/sections   // Add section
+PUT    /api/sections/:id           // Update section
+DELETE /api/sections/:id           // Delete section
+
+// Lessons
+POST   /api/sections/:id/lessons   // Add lesson
+GET    /api/lessons/:id            // Lesson content
+PUT    /api/lessons/:id            // Update lesson
+DELETE /api/lessons/:id            // Delete lesson
+POST   /api/lessons/:id/complete   // Mark as complete
+
+// Quizzes
+POST   /api/lessons/:id/quiz       // Create quiz
+GET    /api/quizzes/:id            // Get quiz
+POST   /api/quizzes/:id/attempt    // Start quiz attempt
+POST   /api/quizzes/:id/submit     // Submit quiz
+GET    /api/quizzes/:id/results    // Quiz results
+
+// Assignments
+POST   /api/lessons/:id/assignment // Create assignment
+GET    /api/assignments/:id        // Get assignment
+POST   /api/assignments/:id/submit // Submit assignment
+PUT    /api/submissions/:id/grade  // Grade submission
+
+// Reviews
+POST   /api/courses/:id/reviews    // Write review
+PUT    /api/reviews/:id            // Update review
+DELETE /api/reviews/:id            // Delete review
+POST   /api/reviews/:id/helpful    // Mark helpful
+
+// Progress
+GET    /api/enrollments/:id/progress   // Course progress
+GET    /api/enrollments/:id/certificate // Get certificate
+
+// Dashboard
+GET    /api/dashboard/student      // Student statistics
+GET    /api/dashboard/instructor   // Instructor statistics
+
+
+React Components Needed
+src/
+├── pages/
+│   ├── courses/
+│   │   ├── CourseBrowse.jsx
+│   │   ├── CourseDetail.jsx
+│   │   ├── CourseCreate.jsx
+│   │   ├── CoursePlayer.jsx
+│   │   └── MyCourses.jsx
+│   ├── instructor/
+│   │   ├── InstructorDashboard.jsx
+│   │   ├── CourseManagement.jsx
+│   │   └── StudentProgress.jsx
+│   └── student/
+│       ├── StudentDashboard.jsx
+│       ├── MyLearning.jsx
+│       └── Certificates.jsx
+├── components/
+│   ├── course/
+│   │   ├── CourseCard.jsx
+│   │   ├── CourseFilters.jsx
+│   │   ├── CurriculumBuilder.jsx
+│   │   ├── LessonPlayer.jsx
+│   │   └── ProgressBar.jsx
+│   ├── quiz/
+│   │   ├── QuizInterface.jsx
+│   │   ├── QuestionCard.jsx
+│   │   └── QuizResults.jsx
+│   ├── assignment/
+│   │   ├── AssignmentView.jsx
+│   │   ├── SubmissionForm.jsx
+│   │   └── GradingInterface.jsx
+│   └── review/
+│       ├── ReviewForm.jsx
+│       ├── ReviewList.jsx
+│       └── StarRating.jsx
